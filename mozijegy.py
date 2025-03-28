@@ -75,7 +75,6 @@ class MovieTicketSystem:
         self.movie_list_label = ttk.Label(self.movie_frame, text="Választható filmek:")
         self.movie_list_label.pack(pady=(0, 5))
         
-        # Listbox a filmek megjelenítésére
         self.movie_listbox = tk.Listbox(self.movie_frame, height=10)
         self.movie_listbox.pack(fill=tk.BOTH, expand=True)
         self.movie_listbox.bind("<<ListboxSelect>>", self.on_movie_select)
@@ -83,7 +82,7 @@ class MovieTicketSystem:
     def load_movies(self):
         cursor = self.conn.cursor()
         cursor.execute("SELECT id, title FROM Movies")
-        self.movies = cursor.fetchall()  # lista (id, title)
+        self.movies = cursor.fetchall() 
         self.movie_listbox.delete(0, tk.END)
         for movie in self.movies:
             self.movie_listbox.insert(tk.END, movie[1])
@@ -211,7 +210,6 @@ class BookingWindow:
         self.quantity_entry.delete(0, tk.END)
     
     def confirm_booking(self):
-        """Véglegesíti a foglalást, ellenőrzi, hogy van-e elég ülőhely, majd elmenti az adatbázisba."""
         total_tickets = sum(item[2] for item in self.selected_tickets)
         if total_tickets == 0:
             messagebox.showerror("Hiba", "Nem adtál meg jegyet!")
@@ -246,8 +244,6 @@ class BookingWindow:
 
 if __name__ == "__main__":
     if not os.path.exists(DB_FILE):
-        initialize_db()
-    else:
         initialize_db()
     
     root = tk.Tk()
