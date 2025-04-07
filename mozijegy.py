@@ -1,7 +1,13 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import sqlite3
 import os
+import sqlite3
+import tkinter as tk
+from tkinter import messagebox
+import ttkbootstrap as ttkb
+from ttkbootstrap.constants import *
+from ttkbootstrap.widgets import Meter
+import plotly.graph_objects as go
+from fpdf import FPDF
+import datetime
 
 DB_FILE = "mozijegy.db"
 
@@ -52,7 +58,7 @@ def initialize_db():
         ticket_types = [
             ("Felnőtt", 3000),
             ("Gyermek", 2000),
-            ("Diák", 2500)
+            ("Diák", 2500),
         ]
         cursor.executemany("INSERT INTO TicketTypes (type, price) VALUES (?, ?)", ticket_types)
     
@@ -69,13 +75,13 @@ class MovieTicketSystem:
         self.load_movies()
     
     def create_main_widgets(self):
-        self.movie_frame = ttk.Frame(self.root, padding=10)
+        self.movie_frame = ttkb.Frame(self.root, padding=10)
         self.movie_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.movie_list_label = ttk.Label(self.movie_frame, text="Választható filmek:")
+        self.movie_list_label = ttkb.Label(self.movie_frame, text="Választható filmek:", font=("Segoe UI", 12, "bold"))
         self.movie_list_label.pack(pady=(0, 5))
         
-        self.movie_listbox = tk.Listbox(self.movie_frame, height=10)
+        self.movie_listbox = tk.Listbox(self.movie_frame, height=10, font=("Segoe UI", 10))
         self.movie_listbox.pack(fill=tk.BOTH, expand=True)
         self.movie_listbox.bind("<<ListboxSelect>>", self.on_movie_select)
     
@@ -113,21 +119,21 @@ class DetailWindow:
         self.conn = conn
         self.app = app
         
-        self.win = tk.Toplevel(master)
+        self.win = ttkb.Toplevel(master)
         self.win.title(f"{title} - Részletek")
         
         self.create_widgets()
     
     def create_widgets(self):
-        frame = ttk.Frame(self.win, padding=10)
+        frame = ttkb.Frame(self.win, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(frame, text=self.title, font=("Helvetica", 16, "bold")).pack(pady=(0,5))
-        ttk.Label(frame, text=self.description, wraplength=300).pack(pady=(0,5))
-        self.seats_label = ttk.Label(frame, text=f"Elérhető ülőhelyek: {self.available_seats}")
+        ttkb.Label(frame, text=self.title, font=("Segoe UI", 16, "bold")).pack(pady=(0,5))
+        ttkb.Label(frame, text=self.description, wraplength=300, font=("Segoe UI", 10)).pack(pady=(0,5))
+        self.seats_label = ttkb.Label(frame, text=f"Elérhető ülőhelyek: {self.available_seats}", font=("Segoe UI", 10, "bold"))
         self.seats_label.pack(pady=(0,5))
         
-        book_button = ttk.Button(frame, text="Jegyfoglalás", command=self.open_booking_window)
+        book_button = ttkb.Button(frame, text="Jegyfoglalás", bootstyle=PRIMARY, command=self.open_booking_window)
         book_button.pack(pady=(10,0))
     
     def open_booking_window(self):
@@ -144,46 +150,64 @@ class BookingWindow:
         
         self.selected_tickets = []
         
-        self.win = tk.Toplevel(master)
+        self.win = ttkb.Toplevel(master)
         self.win.title(f"Jegyfoglalás - {movie_title}")
-        self.app = app
         self.create_widgets()
     
     def create_widgets(self):
-        frame = ttk.Frame(self.win, padding=10)
+        frame = ttkb.Frame(self.win, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
+
+        percent = round((self.conn.execute("SELECT booked_seats, total_seats FROM Movies WHERE id=?", (self.movie_id,)).fetchone()[0] / self.conn.execute("SELECT total_seats FROM Movies WHERE id=?", (self.movie_id,)).fetchone()[0]) * 100)
+        color = "success" if percent < 40 else "warning" if percent < 90 else "danger"
         
-        ttk.Label(frame, text="Jegytípus:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.meter = Meter(
+            frame,
+            bootstyle=color,
+            subtext="Foglaltság",
+            amountused=percent,
+            amounttotal=100,
+            meterthickness=15,
+            textfont=("Helvetica", 12, "bold"),
+            subtextfont=("Helvetica", 10)
+        )
+        self.meter.grid(row=0, column=2, rowspan=5, padx=(20, 0), pady=10)
+        
+        ttkb.Label(frame, text="Jegytípus:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.ticket_type_var = tk.StringVar()
         self.ticket_types = self.get_ticket_types()
-        self.ticket_type_dropdown = ttk.Combobox(frame, textvariable=self.ticket_type_var, state="readonly")
+        self.ticket_type_dropdown = ttkb.Combobox(frame, textvariable=self.ticket_type_var, state="readonly", bootstyle=INFO)
         self.ticket_type_dropdown['values'] = [tt[1] for tt in self.ticket_types]
         self.ticket_type_dropdown.grid(row=0, column=1, sticky=tk.W, pady=5)
         if self.ticket_types:
             self.ticket_type_dropdown.current(0)
         
-        ttk.Label(frame, text="Mennyiség:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.quantity_entry = ttk.Entry(frame)
+        ttkb.Label(frame, text="Mennyiség:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.quantity_entry = ttkb.Entry(frame, bootstyle=SECONDARY)
         self.quantity_entry.grid(row=1, column=1, sticky=tk.W, pady=5)
         
-        add_button = ttk.Button(frame, text="Jegy hozzáadása", command=self.add_ticket)
+        add_button = ttkb.Button(frame, text="Jegy hozzáadása", bootstyle=SUCCESS, command=self.add_ticket)
         add_button.grid(row=2, column=0, columnspan=2, pady=5)
         
-        ttk.Label(frame, text="Hozzáadott jegyek:").grid(row=3, column=0, columnspan=2, pady=(10, 5))
-        self.tickets_listbox = tk.Listbox(frame, height=5, width=40)
+        ttkb.Label(frame, text="Hozzáadott jegyek:").grid(row=3, column=0, columnspan=2, pady=(10, 5))
+        self.tickets_listbox = tk.Listbox(frame, height=5, width=40, font=("Segoe UI", 10))
         self.tickets_listbox.grid(row=4, column=0, columnspan=2, pady=5)
         
-        confirm_button = ttk.Button(frame, text="Foglalás véglegesítése", command=self.confirm_booking)
+        confirm_button = ttkb.Button(frame, text="Foglalás véglegesítése", bootstyle=PRIMARY, command=self.confirm_booking)
         confirm_button.grid(row=5, column=0, columnspan=2, pady=(10,0))
+        
+        delete_btn = ttkb.Button(frame, text="Foglalás törlése", command=self.delete_booking_window, bootstyle="danger")
+        delete_btn.grid(row=3, column=0, columnspan=2, pady=(5, 10))
+
+        stat_btn = ttkb.Button(frame, text="Statisztika megtekintése", command=self.show_statistics, bootstyle="info")
+        stat_btn.grid(row=6, column=0, columnspan=2, pady=(5, 0))
     
     def get_ticket_types(self):
-        """Lekérdezi a TicketTypes táblából az összes jegytípust."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT id, type, price FROM TicketTypes")
         return cursor.fetchall()
     
     def add_ticket(self):
-        """Hozzáadja a kiválasztott jegytípust és darabszámot az ideiglenes listához."""
         ticket_type_name = self.ticket_type_var.get()
         try:
             quantity = int(self.quantity_entry.get())
@@ -208,6 +232,34 @@ class BookingWindow:
         self.selected_tickets.append((ticket_type_id, ticket_type_name, quantity))
         self.tickets_listbox.insert(tk.END, f"{ticket_type_name}: {quantity} db")
         self.quantity_entry.delete(0, tk.END)
+
+    def delete_booking_window(self):
+        def delete():
+            try:
+                booking_id = int(entry.get())
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT movie_id, quantity FROM Bookings WHERE id=?", (booking_id,))
+                result = cursor.fetchone()
+                if not result:
+                    messagebox.showerror("Hiba", "Nincs ilyen foglalás.")
+                    return
+                movie_id, quantity = result
+                cursor.execute("DELETE FROM Bookings WHERE id=?", (booking_id,))
+                cursor.execute("UPDATE Movies SET booked_seats = booked_seats - ? WHERE id=?", (quantity, movie_id))
+                self.conn.commit()
+                messagebox.showinfo("Siker", "Foglalás törölve.")
+                top.destroy()
+                self.win.destroy()
+                self.detail_window.app.refresh_movies()
+            except Exception as e:
+                messagebox.showerror("Hiba", f"Hiba történt: {e}")
+
+        top = tk.Toplevel(self.master)
+        top.title("Foglalás törlése")
+        ttkb.Label(top, text="Foglalási szám:").pack(padx=10, pady=5)
+        entry = tk.Entry(top)
+        entry.pack(padx=10, pady=5)
+        ttkb.Button(top, text="Törlés", command=delete, bootstyle="danger").pack(padx=10, pady=10)
     
     def confirm_booking(self):
         total_tickets = sum(item[2] for item in self.selected_tickets)
@@ -232,20 +284,61 @@ class BookingWindow:
                 SET booked_seats = booked_seats + ?
                 WHERE id = ?
             """, (total_tickets, self.movie_id))
+
+            output_dir = "tickets"
+            os.makedirs(output_dir, exist_ok=True)
+
+            pdf = FPDF()
+            pdf.add_page()
+
+            font_path = "DejaVuSans.ttf"
+            pdf.add_font("DejaVu", "", font_path, uni=True)
+            pdf.set_font("DejaVu", size=12)
+
+            pdf.cell(200, 10, txt="Mozi Jegy", ln=True, align='C')
+            pdf.ln(10)
+            pdf.cell(200, 10, txt=f"Film címe: {self.movie_title}", ln=True)
+            pdf.cell(200, 10, txt=f"Dátum: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True)
+
+            pdf.ln(5)
+            for idx, ticket in enumerate(self.selected_tickets, 1):
+                pdf.cell(200, 10, txt=f"{idx}. Jegytípus: {ticket[1]} - {ticket[2]} db", ln=True)
+
+            last_id = cursor.execute("SELECT MAX(id) FROM Bookings").fetchone()[0]
+            pdf.ln(5)
+            pdf.cell(200, 10, txt=f"Foglalási szám: {last_id}", ln=True)
+
+            file_path = os.path.join(output_dir, f"jegy_{last_id}.pdf")
+            pdf.output(file_path)
+
             self.conn.commit()
             messagebox.showinfo("Siker", "A foglalás sikeresen rögzítésre került!")
             self.win.destroy()
             self.detail_window.available_seats -= total_tickets
             self.detail_window.seats_label.config(text=f"Elérhető ülőhelyek: {self.detail_window.available_seats}")
-            self.app.refresh_movies()
+            self.detail_window.app.refresh_movies()
         except Exception as e:
             self.conn.rollback()
             messagebox.showerror("Hiba", f"Adatbázis hiba: {e}")
+
+    def show_statistics(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT title, total_seats, booked_seats FROM Movies")
+        data = cursor.fetchall()
+
+        titles = [row[0] for row in data]
+        occupancy = [round((row[2] / row[1]) * 100) if row[1] > 0 else 0 for row in data]
+
+        fig = go.Figure(data=[
+            go.Bar(x=titles, y=occupancy, marker_color='lightskyblue')
+        ])
+        fig.update_layout(title="Terem foglaltsági arányok", xaxis_title="Film", yaxis_title="Foglaltság (%)", yaxis_range=[0, 100])
+        fig.show()
 
 if __name__ == "__main__":
     if not os.path.exists(DB_FILE):
         initialize_db()
     
-    root = tk.Tk()
+    root = ttkb.Window(themename="superhero")
     app = MovieTicketSystem(root)
     root.mainloop()
