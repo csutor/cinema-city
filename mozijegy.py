@@ -47,9 +47,10 @@ def initialize_db():
     cursor.execute("SELECT COUNT(*) FROM Movies")
     if cursor.fetchone()[0] == 0:
         movies = [
-            ("Film 1", "Ez az első film leírása.", 100, 0),
-            ("Film 2", "Ez a második film leírása.", 80, 0),
-            ("Film 3", "Ez a harmadik film leírása.", 120, 0)
+            ("Eichberger Máté - A dokumentumfilm", "Ez a film Eichberger Máté, középszerű futballista életét mutatja be.", 100, 0),
+            ("A rekesz kalandjai", "Út a hírnévhez.", 80, 0),
+            ("Varga Áron - Egy péntek este", "Egy húzos péntek utáni kaland.", 60, 0),
+            ("Zalán - 18+", "18+", 120, 0)
         ]
         cursor.executemany("INSERT INTO Movies (title, description, total_seats, booked_seats) VALUES (?, ?, ?, ?)", movies)
     
@@ -69,6 +70,7 @@ class MovieTicketSystem:
     def __init__(self, root):
         self.root = root
         self.root.title("Mozi Jegyfoglaló")
+        self.root.geometry("300x300")
         self.conn = sqlite3.connect(DB_FILE)
         
         self.create_main_widgets()
@@ -133,7 +135,7 @@ class DetailWindow:
         self.seats_label = ttkb.Label(frame, text=f"Elérhető ülőhelyek: {self.available_seats}", font=("Segoe UI", 10, "bold"))
         self.seats_label.pack(pady=(0,5))
         
-        book_button = ttkb.Button(frame, text="Jegyfoglalás", bootstyle=PRIMARY, command=self.open_booking_window)
+        book_button = ttkb.Button(frame, text="Jegyfoglalás", bootstyle="PRIMARY", command=self.open_booking_window)
         book_button.pack(pady=(10,0))
     
     def open_booking_window(self):
@@ -149,6 +151,7 @@ class BookingWindow:
         self.detail_window = detail_window
         
         self.selected_tickets = []
+        self.price = 0
         
         self.win = ttkb.Toplevel(master)
         self.win.title(f"Jegyfoglalás - {movie_title}")
@@ -208,7 +211,20 @@ class BookingWindow:
         return cursor.fetchall()
     
     def add_ticket(self):
+        cursor = self.conn.cursor()
         ticket_type_name = self.ticket_type_var.get()
+
+        cursor.execute("SELECT price FROM TicketTypes WHERE type=?", (ticket_type_name,))
+        result = cursor.fetchone()  # Az eredményt itt olvassuk ki
+        
+        if result:  # Ellenőrizzük, hogy van-e eredmény
+            price = result[0]  # Az ár az első oszlopban található
+            self.price += price * int(self.quantity_entry.get())  # Hozzáadjuk az árakat a teljes összeghez
+        else:
+            messagebox.showerror("Hiba", "Érvénytelen jegytípus!")
+            return
+        
+
         try:
             quantity = int(self.quantity_entry.get())
         except ValueError:
@@ -299,6 +315,7 @@ class BookingWindow:
             pdf.ln(10)
             pdf.cell(200, 10, txt=f"Film címe: {self.movie_title}", ln=True)
             pdf.cell(200, 10, txt=f"Dátum: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True)
+            pdf.cell(200, 10, txt=f"Ár: {self.price:.0f} Ft", ln=True)
 
             pdf.ln(5)
             for idx, ticket in enumerate(self.selected_tickets, 1):
