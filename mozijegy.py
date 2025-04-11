@@ -215,11 +215,11 @@ class BookingWindow:
         ticket_type_name = self.ticket_type_var.get()
 
         cursor.execute("SELECT price FROM TicketTypes WHERE type=?", (ticket_type_name,))
-        result = cursor.fetchone()  # Az eredményt itt olvassuk ki
+        result = cursor.fetchone()
         
-        if result:  # Ellenőrizzük, hogy van-e eredmény
-            price = result[0]  # Az ár az első oszlopban található
-            self.price += price * int(self.quantity_entry.get())  # Hozzáadjuk az árakat a teljes összeghez
+        if result:
+            price = result[0]
+            self.price += price * int(self.quantity_entry.get())
         else:
             messagebox.showerror("Hiba", "Érvénytelen jegytípus!")
             return
@@ -289,26 +289,22 @@ class BookingWindow:
         
         cursor = self.conn.cursor()
         
-        # Jegytípusok mennyiségei
         adult_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Felnőtt")
         child_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Gyermek")
         student_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Diák")
         
         try:
-            # Foglalás mentése az adatbázisba
             cursor.execute("""
                 INSERT INTO Bookings (movie_id, adult_quantity, child_quantity, student_quantity)
                 VALUES (?, ?, ?, ?)
             """, (self.movie_id, adult_quantity, child_quantity, student_quantity))
 
-            # A foglaltság frissítése
             cursor.execute("""
                 UPDATE Movies
                 SET booked_seats = booked_seats + ?
                 WHERE id = ?
             """, (total_tickets, self.movie_id))
 
-            # PDF generálás
             output_dir = "tickets"
             os.makedirs(output_dir, exist_ok=True)
 
