@@ -37,10 +37,10 @@ def initialize_db():
         CREATE TABLE IF NOT EXISTS Bookings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             movie_id INTEGER NOT NULL,
-            ticket_type_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            FOREIGN KEY(movie_id) REFERENCES Movies(id),
-            FOREIGN KEY(ticket_type_id) REFERENCES TicketTypes(id)
+            adult_quantity INTEGER NOT NULL DEFAULT 0,
+            child_quantity INTEGER NOT NULL DEFAULT 0,
+            student_quantity INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(movie_id) REFERENCES Movies(id)
         )
     """)
     
@@ -254,14 +254,14 @@ class BookingWindow:
             try:
                 booking_id = int(entry.get())
                 cursor = self.conn.cursor()
-                cursor.execute("SELECT movie_id, quantity FROM Bookings WHERE id=?", (booking_id,))
+                cursor.execute("SELECT movie_id, adult_quantity, child_quantity, student_quantity FROM Bookings WHERE id=?", (booking_id,))
                 result = cursor.fetchone()
                 if not result:
                     messagebox.showerror("Hiba", "Nincs ilyen foglalás.")
                     return
-                movie_id, quantity = result
+                movie_id, adult_quantity, child_quantity, student_quantity = result
                 cursor.execute("DELETE FROM Bookings WHERE id=?", (booking_id,))
-                cursor.execute("UPDATE Movies SET booked_seats = booked_seats - ? WHERE id=?", (quantity, movie_id))
+                cursor.execute("UPDATE Movies SET booked_seats = booked_seats - ? WHERE id=?", (adult_quantity + child_quantity + student_quantity, movie_id))
                 self.conn.commit()
                 messagebox.showinfo("Siker", "Foglalás törölve.")
                 top.destroy()
@@ -276,7 +276,7 @@ class BookingWindow:
         entry = tk.Entry(top)
         entry.pack(padx=10, pady=5)
         ttkb.Button(top, text="Törlés", command=delete, bootstyle="danger").pack(padx=10, pady=10)
-    
+
     def confirm_booking(self):
         total_tickets = sum(item[2] for item in self.selected_tickets)
         if total_tickets == 0:
@@ -288,19 +288,27 @@ class BookingWindow:
             return
         
         cursor = self.conn.cursor()
+        
+        # Jegytípusok mennyiségei
+        adult_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Felnőtt")
+        child_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Gyermek")
+        student_quantity = sum(item[2] for item in self.selected_tickets if item[1] == "Diák")
+        
         try:
-            for ticket in self.selected_tickets:
-                ticket_type_id, ticket_type, quantity = ticket
-                cursor.execute("""
-                    INSERT INTO Bookings (movie_id, ticket_type_id, quantity)
-                    VALUES (?, ?, ?)
-                """, (self.movie_id, ticket_type_id, quantity))
+            # Foglalás mentése az adatbázisba
+            cursor.execute("""
+                INSERT INTO Bookings (movie_id, adult_quantity, child_quantity, student_quantity)
+                VALUES (?, ?, ?, ?)
+            """, (self.movie_id, adult_quantity, child_quantity, student_quantity))
+
+            # A foglaltság frissítése
             cursor.execute("""
                 UPDATE Movies
                 SET booked_seats = booked_seats + ?
                 WHERE id = ?
             """, (total_tickets, self.movie_id))
 
+            # PDF generálás
             output_dir = "tickets"
             os.makedirs(output_dir, exist_ok=True)
 
@@ -337,7 +345,6 @@ class BookingWindow:
         except Exception as e:
             self.conn.rollback()
             messagebox.showerror("Hiba", f"Adatbázis hiba: {e}")
-
     def show_statistics(self):
         cursor = self.conn.cursor()
         cursor.execute("SELECT title, total_seats, booked_seats FROM Movies")
