@@ -11,6 +11,17 @@ import datetime
 
 DB_FILE = "mozijegy.db"
 
+def center_window(win):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    screen_w = win.winfo_screenwidth()
+    screen_h = win.winfo_screenheight()
+    x = (screen_w // 2) - (w // 2)
+    y = (screen_h // 2) - (h // 2)
+    win.geometry(f'{w}x{h}+{x}+{y}')
+
+
 def initialize_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -71,6 +82,7 @@ class MovieTicketSystem:
         self.root = root
         self.root.title("Mozi Jegyfoglaló")
         self.root.geometry("300x300")
+        center_window(self.root)
         self.conn = sqlite3.connect(DB_FILE)
         
         self.create_main_widgets()
@@ -125,6 +137,7 @@ class DetailWindow:
         self.win.title(f"{title} - Részletek")
         
         self.create_widgets()
+        center_window(self.win)
     
     def create_widgets(self):
         frame = ttkb.Frame(self.win, padding=10)
@@ -156,6 +169,7 @@ class BookingWindow:
         self.win = ttkb.Toplevel(master)
         self.win.title(f"Jegyfoglalás - {movie_title}")
         self.create_widgets()
+        center_window(self.win)
     
     def create_widgets(self):
         frame = ttkb.Frame(self.win, padding=10)
@@ -276,6 +290,7 @@ class BookingWindow:
         entry = tk.Entry(top)
         entry.pack(padx=10, pady=5)
         ttkb.Button(top, text="Törlés", command=delete, bootstyle="danger").pack(padx=10, pady=10)
+        center_window(self.top)
 
     def confirm_booking(self):
         total_tickets = sum(item[2] for item in self.selected_tickets)
